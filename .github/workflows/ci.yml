@@ -21,6 +21,7 @@ on:
   push:
     branches:
       - main
+      - 'orcrist/**'
   pull_request:
     paths:
       # Artifacts that must be included in releases, such as LICENSE and NOTICE, are deliberately not excluded so we can verify they will be bundled.

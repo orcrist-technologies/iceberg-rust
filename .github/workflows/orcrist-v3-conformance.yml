@@ -1,0 +1,64 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Orcrist fork only: Iceberg v3 conformance over a table written by an
+# independent writer (Apache Spark with Iceberg Java), never by this fork.
+name: Orcrist v3 conformance
+
+on:
+  push:
+    branches:
+      - 'orcrist/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v3-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-builder
+
+      - name: Write a v3 table with Spark and Iceberg Java
+        run: |
+          V3="$RUNNER_TEMP/v3"
+          mkdir -p "$V3"
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -w /tmp -v /etc/passwd:/etc/passwd:ro \
+            -v "$V3:$V3" \
+            -v "$GITHUB_WORKSPACE/.github/orcrist/spark-v3.sql:/in.sql:ro" \
+            apache/spark@sha256:e334db9626cb9c5a3e72928c2c2f0efc668769a0b605f116afe6ea7adb38f546 \
+            /opt/spark/bin/spark-sql \
+            --packages org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0 \
+            --conf spark.jars.ivy=/tmp/ivy2 \
+            --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+            --conf spark.sql.catalog.cat=org.apache.iceberg.spark.SparkCatalog \
+            --conf spark.sql.catalog.cat.type=hadoop \
+            --conf spark.sql.catalog.cat.warehouse=$V3/wh \
+            -f /in.sql
+
+      - name: Run the v3 conformance tests
+        run: |
+          META=$(ls "$RUNNER_TEMP"/v3/wh/db/t/metadata/v*.metadata.json | sort -V | tail -1)
+          echo "metadata: $META"
+          ORCRIST_V3_METADATA="$META" \
+            cargo test -p iceberg --test orcrist_v3_conformance -- --nocapture
