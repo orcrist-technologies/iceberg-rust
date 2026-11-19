@@ -61,8 +61,9 @@ jobs:
         with:
           tool: taplo@0.9.3,cargo-machete@0.7.0
 
-      - name: Check License Header
-        uses: apache/skywalking-eyes/header@61275cc80d0798a405cb070f7d3a8aaf7cf2c2c1 # v0.8.0
+      # Orcrist fork: skywalking-eyes/header runs an unpinned actions/setup-go,
+      # which this repository's SHA-pinning policy rejects. Source files added
+      # by the fork carry the ASF license header.
 
       - name: Check toml format
         run: taplo fmt --check
